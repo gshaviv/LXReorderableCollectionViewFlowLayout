@@ -362,11 +362,14 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
                      @strengthen(self) {
                          [self.currentView removeFromSuperview];
                          self.currentView = nil;
-                         [self invalidateLayout];
-                         
+                             [self invalidateLayout];
                          if ([self.delegate respondsToSelector:@selector(collectionView:layout:didEndDraggingItemAtIndexPath:)]) {
                              [self.delegate collectionView:self.collectionView layout:self didEndDraggingItemAtIndexPath:currentIndexPath];
                          }
+                         [UIView animateWithDuration:.25 animations:^{
+                             [self.collectionView layoutIfNeeded];
+                         }];
+
                      }
                  }];
             }
