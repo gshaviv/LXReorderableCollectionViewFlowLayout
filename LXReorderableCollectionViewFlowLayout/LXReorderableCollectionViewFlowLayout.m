@@ -67,6 +67,8 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
 @property (strong, nonatomic) UIView *currentView;
 @property (assign, nonatomic) CGPoint currentViewCenter;
 @property (assign, nonatomic) CGPoint panTranslationInCollectionView;
+@property (assign, nonatomic) CGPoint touchStartLocationInCollectionView;
+
 @property (strong, nonatomic) CADisplayLink *displayLink;
 
 @property (assign, nonatomic, readonly) id<LXReorderableCollectionViewDataSource> dataSource;
@@ -85,7 +87,7 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
     _longPressGestureRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self
                                                                                 action:@selector(handleLongPressGesture:)];
     _longPressGestureRecognizer.delegate = self;
-    
+
     // Links the default long press gesture recognizer to the custom long press gesture recognizer we are creating now
     // by enforcing failure dependency so that they doesn't clash.
     for (UIGestureRecognizer *gestureRecognizer in self.collectionView.gestureRecognizers) {
@@ -95,11 +97,6 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
     }
     
     [self.collectionView addGestureRecognizer:_longPressGestureRecognizer];
-    
-    _panGestureRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self
-                                                                    action:@selector(handlePanGesture:)];
-    _panGestureRecognizer.delegate = self;
-    [self.collectionView addGestureRecognizer:_panGestureRecognizer];
 
     // Useful in multiple scenarios: one common scenario being when the Notification Center drawer is pulled down
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(handleApplicationWillResignActive:) name: UIApplicationWillResignActiveNotification object:nil];
@@ -304,6 +301,8 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
             [self.collectionView addSubview:self.currentView];
             
             self.currentViewCenter = self.currentView.center;
+
+            self.touchStartLocationInCollectionView = [gestureRecognizer locationInView:self.collectionView];
             
             @weaken(self);
             [UIView
@@ -333,6 +332,40 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
             
             [self invalidateLayout];
         } break;
+
+        case UIGestureRecognizerStateChanged: {
+            CGPoint currentTouchLocaiton = [gestureRecognizer locationInView:self.collectionView];
+            self.panTranslationInCollectionView = CGPointMake(currentTouchLocaiton.x - self.touchStartLocationInCollectionView.x, currentTouchLocaiton.y - self.touchStartLocationInCollectionView.y);
+            CGPoint viewCenter = self.currentView.center = LXS_CGPointAdd(self.currentViewCenter, self.panTranslationInCollectionView);
+
+            [self invalidateLayoutIfNecessary];
+
+            switch (self.scrollDirection) {
+                case UICollectionViewScrollDirectionVertical: {
+                    if (viewCenter.y < (CGRectGetMinY(self.collectionView.bounds) + self.scrollingTriggerEdgeInsets.top)) {
+                        [self setupScrollTimerInDirection:LXScrollingDirectionUp];
+                    } else {
+                        if (viewCenter.y > (CGRectGetMaxY(self.collectionView.bounds) - self.scrollingTriggerEdgeInsets.bottom)) {
+                            [self setupScrollTimerInDirection:LXScrollingDirectionDown];
+                        } else {
+                            [self invalidatesScrollTimer];
+                        }
+                    }
+                } break;
+                case UICollectionViewScrollDirectionHorizontal: {
+                    if (viewCenter.x < (CGRectGetMinX(self.collectionView.bounds) + self.scrollingTriggerEdgeInsets.left)) {
+                        [self setupScrollTimerInDirection:LXScrollingDirectionLeft];
+                    } else {
+                        if (viewCenter.x > (CGRectGetMaxX(self.collectionView.bounds) - self.scrollingTriggerEdgeInsets.right)) {
+                            [self setupScrollTimerInDirection:LXScrollingDirectionRight];
+                        } else {
+                            [self invalidatesScrollTimer];
+                        }
+                    }
+                } break;
+            }
+        } break;
+
         case UIGestureRecognizerStateCancelled:
         case UIGestureRecognizerStateEnded: {
             NSIndexPath *currentIndexPath = self.selectedItemIndexPath;
@@ -385,9 +418,9 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
         case UIGestureRecognizerStateChanged: {
             self.panTranslationInCollectionView = [gestureRecognizer translationInView:self.collectionView];
             CGPoint viewCenter = self.currentView.center = LXS_CGPointAdd(self.currentViewCenter, self.panTranslationInCollectionView);
-            
+
             [self invalidateLayoutIfNecessary];
-            
+
             switch (self.scrollDirection) {
                 case UICollectionViewScrollDirectionVertical: {
                     if (viewCenter.y < (CGRectGetMinY(self.collectionView.bounds) + self.scrollingTriggerEdgeInsets.top)) {
