@@ -302,6 +302,11 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
                 return;
             }
             
+            if(!currentIndexPath)
+            {
+                return;
+            }
+            
             self.selectedItemIndexPath = currentIndexPath;
             
             if ([self.delegate respondsToSelector:@selector(collectionView:layout:willBeginDraggingItemAtIndexPath:)]) {
